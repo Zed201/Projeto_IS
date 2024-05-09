@@ -7,6 +7,6 @@ Situação atual:
 Q1 - Emanuelle Giovanna                     ( )
 Q2 - Heitor Riquelme                        ( )
 Q3 - Henrique César                         ( )
-Q4 - Luis Gustavo                           ( )
+Q4 - Luiz Gustavo                           ( )
 Q5 - Emanuelle Giovanna & Henrique César    ( )
-Q6 - Heitor Riquelme & Luis Gustavo         ( )
+Q6 - Heitor Riquelme & Luiz Gustavo         ( )
