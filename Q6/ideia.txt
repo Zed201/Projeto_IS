@@ -1,0 +1,9 @@
+Ideia inicial só para não esquecer:
+Criar uma fila, talvez linked list, para comportar structs, que basicamente vão representar os processos
+Cada struct vai ter um nome e um pthread_t para referenciar a thread, uma variavel de pthread_cond e um mutex e uma condição adicional
+A ideia seria iniciar várias threads na main e ir colocando a representação delas na fila e logo bloquear elas com o cond respectivo
+A thread de escalonador basicamente iria tirar uma thread da fila e dar um signal para a cond delas tirando elas do sleep
+depois de passado um tempo da thread executando, basicamente o escalonador muda a condição adicional do 'processo' e com um if fazemos ele cair num wait 
+da pthread_cond denovo, assim ele indo dormir e gerenciamos a fila para ela ir para o final
+Poderiamos usar a mesma variavel de condição da struct, como uma flag para alem de direcionar se ela entra ou não num wait, para a propria thread mudar ela para dizer que acabou
+assim o escalonador poderia 'descartar' e terminar o processo
