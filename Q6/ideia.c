@@ -15,36 +15,22 @@ struct pro{
 volatile int flag = 0;
 pthread_cond_t c = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
 int finalizer = 0;
 
 void *func(void *agrs){
         pthread_cond_wait(&c, &m);
-        for (int i = 0; i < 999999; i++) {
-               /* if(atomic_flag_test_and_set(&condi)){
-                        // o problema é que ele retorna o valor, mas troca para true a variavel
-                        // nao entra aqui
-                        pthread_cond_wait(&c, &m);
-                        // fica esperando
-                } else {
-                        // caso a flag esteja em false ele vai retornar false 
-                        // e coloca ela como false denovo
-                        //atomic_flag_clear(&condi);
-                        // acaba executando tudo e so depois vai
-                }*/
-                if(atomic_load(&flag)){ // flag 1 ele para, zero ele continua
+        for (int i = 0; i < 2000; i++) {
+                if(!atomic_load(&flag)){ // flag 1 ele para, zero ele continua
                         pthread_cond_wait(&c, &m);
                 }
                 // alguma execuçao
                 printf("Alguma coisa %d\n", i);
-                
-
         }
-        pthread_mutex_lock(&m2); // usando o mutex m ele nao entra, ou seja o mutex ta travado por algum motivo
-        printf("Terminando alguma coisa\n");
+        pthread_mutex_unlock(&m);
+        printf("Saiu loop\n");
+        pthread_mutex_lock(&m); // Funcionando pois tem de destravar o mutex
         finalizer = 1;
-        printf("Terminando alguma coisa\n");
-        pthread_mutex_unlock(&m2);
+        pthread_mutex_unlock(&m);
         pthread_exit(NULL);
 }
 
@@ -52,29 +38,29 @@ void *func(void *agrs){
 
 int main(){
         pthread_t ids;
+        // TODO:
         // testar se a inicialização dinamica do cond e do mutex ele funciona para ser passado
         // em uma struct ou se nao pensar em algo
+        int exTms = 5, waitTms = 3000; 
         pthread_create(&ids, NULL, func, NULL);
         printf("thread criada\n");
         sleep(2);
         printf("Inciando\n");
-        while(1){
-                printf("Iniciando thread por 1 seg\n");
+        int i = 1;
+        while(i){
+                printf("Iniciando thread por %d ms\n", exTms);
+                atomic_store(&flag, 1);
                 pthread_cond_signal(&c);
 
-                sleep(1); // deixa executar por 3 seg
-                // atomic_flag_clear(&c);
-                // concertae if do finalizer
-                atomic_store(&flag, 1);
-                printf("Thread dormindo por 1 seg\n");
+                usleep(1000 * exTms); // deixa executar por 3 seg
+                printf("Thread dormindo por %d ms\n", waitTms);
                 atomic_store(&flag, 0);
-                sleep(1);
-                // pthread_mutex_lock(&m);
-                if(finalizer == 1){
-                        // a thread terminou
-                        break;
+                usleep(waitTms * 1000);
+                pthread_mutex_lock(&m);
+                if(finalizer){ // talvez usar _atomic nisso
+                        i = 0;
                 }
-                // pthread_mutex_unlock(&m);
+                pthread_mutex_unlock(&m);
         }
 
         return 0;
