@@ -5,8 +5,12 @@
 #include <pthread.h>
 #include <limits.h>
 
+/**************************************************************************************************************/
+//Pode alterar os valores de N e TAM para testar outros casos (lembrar de mudar o array também se necessário);//
+/**************************************************************************************************************/
+
 // Parâmetros de teste;
-#define N 10                         // Número de threads e partições do array;
+#define N 10                        // Número de threads e partições do array;
 #define TAM 100                     // Tamanho do array;
 
 // Array exemplo para teste de ordenação;
@@ -76,8 +80,11 @@ void *bubblesort(void *arg)
     // Variáveis auxiliares;
     int i, j, temp;
     int start = *((int *)arg);      // Início da parte do array;
-    int end = start + (TAM / N);    // Fim da parte do array;
-    // Ajustar o fim da última parte do array;
+    int end = start + (TAM / N);    // Fim da parte do array;                                 
+    if (start == (N-1) * (TAM/N))   // Ajustar o fim da última parte do array;
+    {
+        end = TAM;
+    }
 
     // Copiar a parte do array para o array auxiliar;
     for (i = start; i < end; i++)
@@ -122,8 +129,15 @@ void *merge(void *arg)
     for (i = 0; i < N; i++)
     {
         start[i] = i * (TAM / N);
-        end[i] = start[i] + (TAM / N);
         index[i] = start[i];
+        if (i != N - 1)
+        {
+            end[i] = start[i] + (TAM / N);
+        }
+        else
+        {
+            end[i] = TAM;
+        }
     }
 
     // Mesclar, de forma ordenada, as partes ordenadas do array auxiliar no array original;
