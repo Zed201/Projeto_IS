@@ -54,7 +54,7 @@ int main()
     }
 
     // Aguardar a conclusão das N threads;
-    for (i = 0; i < N; i++)
+    for (i = 0; i < N; i++)         
     {
         pthread_join(threads[i], NULL);
     }
@@ -70,8 +70,7 @@ int main()
 
     // Encerrar o programa;
     pthread_exit(NULL);
-
-    return 0;
+    return 0;                       // Não deve ser executado, mas é necessário por boas práticas e para evitar warnings;
 }
 
 // Código do bubble sort das partes do array;
@@ -83,7 +82,7 @@ void *bubblesort(void *arg)
     int end = start + (TAM / N);    // Fim da parte do array;                                 
     if (start == (N-1) * (TAM/N))   // Ajustar o fim da última parte do array;
     {
-        end = TAM;
+        end = TAM;                  // A última parte do array terá um tamanho menor caso TAM não seja divisível por N;
     }
 
     // Copiar a parte do array para o array auxiliar;
