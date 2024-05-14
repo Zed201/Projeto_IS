@@ -67,6 +67,12 @@ int main()
     // Aguardar a conclusão da thread de mesclagem;
     pthread_join(threads[N], NULL);
 
+    // Liberar a memória alocada para os identificadores das threads;
+    for (i = 0; i < N; i++)
+    {
+        free(ids[i]);
+    }
+
     // Destruir a barreira;
     pthread_barrier_destroy(&barrier);
 
