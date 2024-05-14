@@ -10,7 +10,7 @@
 /**************************************************************************************************************/
 
 // Parâmetros de teste;
-#define N 10                        // Número de threads e partições do array;
+#define N 10                        // Número de threads e partições do array (não deve ser maior que TAM);
 #define TAM 100                     // Tamanho do array;
 
 // Array exemplo para teste de ordenação;
@@ -54,7 +54,7 @@ int main()
     }
 
     // Aguardar a conclusão das N threads;
-    for (i = 0; i < N; i++)         // Apenas por segurança, pois a barreira já fez isso;
+    for (i = 0; i < N; i++)
     {
         pthread_join(threads[i], NULL);
     }
