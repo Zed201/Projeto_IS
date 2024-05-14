@@ -37,8 +37,10 @@ void *merge(void *arg);             // Mesclar as partes ordenadas;
 
 int main()
 {
-    // Variáveis auxiliares;
+    // Variável das threads;
     pthread_t threads[N + 1];       // N threads para ordenar as partes do array e 1 thread para mesclar;
+    
+    // Variáveis auxiliares;
     int *ids[N];                    // Identificadores das threads;
     int i;
 
