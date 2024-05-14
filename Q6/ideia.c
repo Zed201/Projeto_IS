@@ -2,33 +2,51 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdatomic.h>
+// ideia da struct processo
 
 struct pro{
-        pthread_cond_t *con;
-        pthread_mutex_t *mutex;
+        char *Nome_Processo;
+        pthread_cond_t con;
+        pthread_mutex_t m1, m2;
+        int flag_exe, flag_end;
         // colocar o pthread_t aqui tbm
 };
 
-// atomic_flag condi = ATOMIC_FLAG_INIT;
-// a forma de verificar o atomic flag é dificl
-volatile int flag = 0;
+struct pro* process_create(char *nome){
+        struct pro *ptr = (struct pro*) malloc(sizeof(struct pro));
+        ptr->Nome_Processo = nome;
+        // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
+        pthread_cond_init(&ptr->con, NULL);
+        pthread_mutex_init(&ptr->m1, NULL);
+        pthread_mutex_init(&ptr->m2, NULL);
+        return ptr;
+}
+
+int flag = 0;
 pthread_cond_t c = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m2 = PTHREAD_MUTEX_INITIALIZER;
 int finalizer = 0;
 
 void *func(void *agrs){
         pthread_cond_wait(&c, &m);
-        for (int i = 0; i < 2000; i++) {
-                if(!atomic_load(&flag)){ // flag 1 ele para, zero ele continua
+        for (int i = 0; i < 1000; i++) {
+                // sem esses mutex ele vai, por algum motivo, era para funcionar, mas n sei pq
+                //pthread_mutex_lock(&m2);
+                if(flag){ // flag 1 ele para, zero ele continua
+                        printf("Thread Vai entrar em espera\n");
                         pthread_cond_wait(&c, &m);
+                        printf("Thread saindo de hibernacao\n");
                 }
+                //pthread_mutex_unlock(&m2);
+
                 // alguma execuçao
                 printf("Alguma coisa %d\n", i);
         }
-        pthread_mutex_unlock(&m);
+
+        pthread_mutex_unlock(&m); // tem de dar unlock pois o m ta trancado
         printf("Saiu loop\n");
-        pthread_mutex_lock(&m); // Funcionando pois tem de destravar o mutex
+        pthread_mutex_lock(&m);
         finalizer = 1;
         pthread_mutex_unlock(&m);
         pthread_exit(NULL);
@@ -41,7 +59,7 @@ int main(){
         // TODO:
         // testar se a inicialização dinamica do cond e do mutex ele funciona para ser passado
         // em uma struct ou se nao pensar em algo
-        int exTms = 5, waitTms = 3000; 
+        int exTms = 1, waitTms = 3000; 
         pthread_create(&ids, NULL, func, NULL);
         printf("thread criada\n");
         sleep(2);
@@ -49,15 +67,24 @@ int main(){
         int i = 1;
         while(i){
                 printf("Iniciando thread por %d ms\n", exTms);
-                atomic_store(&flag, 1);
+                // se nao vai colocar no thread esse m2, ele nao tem necessidade de usar ele aqui
+                pthread_mutex_lock(&m2);
+                flag = 0; 
+                pthread_mutex_unlock(&m2);
+
                 pthread_cond_signal(&c);
 
-                usleep(1000 * exTms); // deixa executar por 3 seg
+                usleep(1000 * exTms);
                 printf("Thread dormindo por %d ms\n", waitTms);
-                atomic_store(&flag, 0);
+
+                pthread_mutex_lock(&m2);
+                flag = 1;
+                pthread_mutex_unlock(&m2);
+
                 usleep(waitTms * 1000);
+
                 pthread_mutex_lock(&m);
-                if(finalizer){ // talvez usar _atomic nisso
+                if(finalizer){ 
                         i = 0;
                 }
                 pthread_mutex_unlock(&m);
