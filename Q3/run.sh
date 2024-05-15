@@ -1,8 +1,10 @@
 #!/bin/sh
 
-set -xe
+#set -xe
 
 clear
-rm "$1"
+if [ -f "$1" ]; then
+    rm "$1"
+fi
 gcc "$1".c -Wall -Wpedantic -Wextra -o "$1"
 ./"$1"

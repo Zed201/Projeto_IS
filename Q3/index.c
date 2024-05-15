@@ -1,126 +1,138 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <string.h>
 
-#include "queue.h"
+#include "queue_safe.h"
+#include "result_safe.h"
 
 #define N_CLIENTES 5
-#define MAX_OPERACOES 250
+#define MAX_OPERACOES 30
 
-enum operat {saque, deposito, consulta};
-enum status {ok, fail, waiting};
+enum operat
+{
+    saque,
+    deposito,
+    consulta
+};
 
-typedef struct operacao {
-    int id;
-    int op;
-    int value;
-    int* retorno;   
-} operacao;
+// fila de operacoes requisitadas para o banco -> interface
+opQueue *queue;
 
-typedef struct resultado {
-    int status;
-    int value;
-} resultado;
+// interface para comunicação com os clientes
+cliente *clientes_com[N_CLIENTES];
 
-// fila para registrar as operacoes e o mutex para assegurar a regiao critica
-opQueue* queue;
-pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t mu_queue = PTHREAD_MUTEX_INITIALIZER;
-
-// condição para avisar o cliente que a operação solicitada foi realizada
-pthread_cond_t cond_clientes[N_CLIENTES];
-// array para guardar o resultado da operação dos clientes
-resultado *result_clientes[N_CLIENTES];
-pthread_mutex_t *mu_result[N_CLIENTES];
-
-void setResult(int idCliente, resultado r);
-
-void *banco(void *ptr) {
-    int contas[N_CLIENTES];
-    
-    for (int i = 0; i < N_CLIENTES; i++) {
-        contas[i] = 0;
+// banco
+void *banco_th(void *args) {
+    int valores[N_CLIENTES]; // array com os valores depositado de cada cliente
+    for (int i = 0; i < N_CLIENTES; i++)
+    {
+        valores[i] = 0;
     }
 
-    for (int i = 0; i < MAX_OPERACOES; i++) {
-        pthread_mutex_lock(&mu_queue);
-        while (isEmpty(queue)) {
-            pthread_cond_wait(&empty, &mu_queue);
+    for (int i = 0; i < N_CLIENTES * MAX_OPERACOES; i++) {
+        operacao next; // variavel onde sera guardada a proxima operacao a ser processada
+        resultado res; // variavel onde serea guardada o resutlado da operacao
+
+        next = getOp_wait(queue); // dorme enquanto espera uma operacao da fila - atomico
+
+        // processa a operacao solicitada
+        if (next.op == consulta) {
+            res.status = ok;
+            res.value = valores[next.id];
         }
-
-        operacao* req;
-        req = dequeue(queue);
-
-        // pensando se preciso de um mutex
-        resultado* res = result_clientes[req->id];
-
-        if (req->op == consulta) {
-            res->status = ok;
-            res->value = contas[req->id];
+        else if (next.value < 0) {
+            res.status = fail;
+            res.value = off;
         }
-        else if (req->value < 0) {
-            res->status = fail;
-            res->value = -1;
-        }
-        else if (req->op == deposito)
-        {
-            contas[req->id] += req->value;
+        else if (next.op == deposito) {
+            valores[next.id] += next.value;
 
-            res->status = ok;
-            res->value = -1;
+            res.status = ok;
+            res.value = off;
         }
-        else if (req->op == saque) {
-            if (contas[req->id] - req->value >= 0) {
-                contas[req->id] -= req->value;
+        else if (next.op == saque) {
+            if (valores[next.id] - next.value >= 0) {
+                valores[next.id] -= next.value;
 
-                res->status = ok;
-                res->value = -1;
+                res.status = ok;
+                res.value = off;
             }
             else {
-                res->status = fail;
-                res->value = -1;
+                res.status = fail;
+                res.value = off;
             }
         }
 
-        pthread_cond_signal(&cond_clientes[req->id]);
-
-        if (req != NULL)
-            free(req);
-        pthread_mutex_unlock(&mu_queue);
+        sendResult(clientes_com[next.id], res); // envia o resultado para o cliente - atomico
     }
 
+    pthread_exit(NULL);
 }
 
-void *cliente(void *id) {
+// cliente
+void *cliente_th(void *args) {
+    int *myID = (int *)args;
 
+    for (int i = 0; i < MAX_OPERACOES; i++) {
+        operacao myOperation;      // variavel onde sera guardada a operacao a ser realizada
+        resultado res;             // variavel onde sera guardado o resultado da operacao
+        myOperation.id = *myID;    // id do cliente
+        myOperation.op = i % 3;    // operacaoes a serem realizadas
+        myOperation.value = i * 3; //
+
+        // trava o mutex do cliente, isso evita o caso em que a operacao é enviada e o
+        // banco processa e retorna o resultado antes do waiting ser colocado no resultado
+        // o waiting é necessário para distinguir operacoes passadas de recetes
+        setWaitingResult(clientes_com[*myID]);
+        sendOp(queue, myOperation); // envia a operacao para o banco
+        res = getWaitingResult(
+            clientes_com[*myID]); // dorme enquanto espera o resultado e libera o mutex do cliente ao fim
+
+        // processa o resultado obtido
+        if (myOperation.op != consulta) {
+            if (res.status == ok)
+            {
+                printf("Cliente %d: Operação realizada com sucesso!\n", *myID + 1);
+            }
+            else if (res.status == fail) // caso de tentar sacar sem saldo suficiente
+            {
+                printf("Cliente %d: Algo incorreto foi solicitado\n", *myID + 1);
+            }
+            else
+            {
+                printf("Cliente %d: Problema\n", *myID + 1);
+            }
+        }
+        else {
+            printf("Cliente %d: Valor guardado: %d\n", *myID + 1, res.value); // consulta de saldo
+        }
+    }
+
+    free(myID);
+    pthread_exit(NULL);
 }
 
-int main() {
-    pthread_t banco_t;
-    pthread_t clientes_t[N_CLIENTES];
-
+int main()
+{
     initQueue(&queue);
-
     for (int i = 0; i < N_CLIENTES; i++) {
-        result_clientes[i] = (resultado *) malloc(sizeof(resultado));
+        initCliente(&clientes_com[i], i);
     }
 
-    for (int i = 0; i < N_CLIENTES; i++) {
-        pthread_cond_init(&cond_clientes[i], NULL);
-    }
+    pthread_t banco;
+    pthread_t clientes[N_CLIENTES];
 
-    pthread_create(&banco_t, NULL, &banco, NULL);
-
+    pthread_create(&banco, NULL, &banco_th, NULL);
     for (int i = 0; i < N_CLIENTES; i++) {
-        int *id = malloc(sizeof(int));
+        int *id = (int *)malloc(sizeof(int));
         *id = i;
-        pthread_create(&clientes_t[i], NULL, &cliente, (void *) id);
+        pthread_create(&(clientes[i]), NULL, &cliente_th, (void *)id);
     }
 
+    // espera todas as threads finalizarem
+    pthread_join(banco, NULL);
     for (int i = 0; i < N_CLIENTES; i++) {
-        pthread_join(clientes_t[i], NULL);
+        pthread_join(clientes[i], NULL);
     }
-    pthread_join(banco_t, NULL);
-    
 }
