@@ -5,7 +5,7 @@ aperfeiçoarmos o uso de threads nos códigos.
 
 Situação atual:
 
-- [ ] Q1 - Emanuelle Giovanna(*egs2*)
+ - [x] Q1 - Emanuelle Giovanna(*egs2*)
  - [x] Q2 - Henrique César(*hchhc*)
  - [x] Q3 - Heitor Riquelme(*hrms2*)
  - [x] Q4 - Luiz Gustavo(*lgpss*)
