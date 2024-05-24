@@ -29,12 +29,13 @@ struct pro{
 };
 
 // TODO: Testar para ver se essa funcao funciona
-pro* process_create(char *nome){
+pro* process_create(char *nome, int qtd){
         struct pro *ptr = (struct pro*) malloc(sizeof(struct pro));
         ptr->Nome_Processo = nome;
+        ptr->flag_end = 0;
         // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
         // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
-        ptr->exec_qtd = 1000000; // tamanho do loop fixo para todos basicamente
+        ptr->exec_qtd = qtd; // tamanho do loop fixo para todos basicamente
         ptr->quantum = 10; // inicia com o padroa de 10 e vai aumentando se ele nao terminar
 
         pthread_cond_init(&ptr->con, NULL);

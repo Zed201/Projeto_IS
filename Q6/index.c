@@ -4,9 +4,10 @@
 #include <stdio.h>
 
 // a principio 1 para testar
+// TODO: Mudar o codigo para ele conseguir executar mais de uma
 #define N 1
 #define quatum_ms 10 // quantum fixo, talvez mudar para um diferente para cada processo
-int flag_quantum = 1; // se 0 ele executa com o mesmo quantum de todos se 1 ele vai aumentando o quantum por processo
+int flag_quantum = 0; // se 0 ele executa com o mesmo quantum de todos se 1 ele vai aumentando o quantum por processo
 fila* lista_pronto;
 
 void *escalonador_func(void* args){
@@ -38,6 +39,7 @@ void *escalonador_func(void* args){
                 pthread_mutex_lock(&temp_pro->m1);
                 if(temp_pro->flag_end){
                         printf("Processo %s finalizado\n", temp_pro->Nome_Processo);
+                        break;
                 } else {
                         push(lista_pronto, temp_pro);
                         printf("Processo não terminou no tempo do quantum e voltara para o final da fila\nEsperando 2s\n");
@@ -73,7 +75,7 @@ void *generic_func(void *args){
         }
 
         pthread_mutex_lock(&p_data->m1);
-        p_data->flag_end = 0;
+        p_data->flag_end = 1;
         pthread_mutex_unlock(&p_data->m1);
         pthread_exit(NULL);
 
@@ -86,7 +88,7 @@ int main(){
         char* nomes[3] = {"T1", "T2", "T3"};
         pro* temp;
         for (int i = 0; i < 3; i++) {
-                temp = process_create(nomes[i]);
+                temp = process_create(nomes[i], 400);
                 pthread_create(&temp->id, NULL, generic_func, temp);
                 push(lista_pronto, temp);
         }
