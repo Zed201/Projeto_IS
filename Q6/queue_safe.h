@@ -5,10 +5,10 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-typedef struct thread thread;
 typedef struct node node;
 typedef struct queue opQueue;
-
+typedef struct pro pro;
+// tentar ver de colocar status
 enum status
 {
     ready,
@@ -16,17 +16,28 @@ enum status
     blocked
 };
 
-// struct que representa um solicitação
-struct thread
-{
-    char *name;          // id da conta
-    int status;          // id do cliente
-    pthread_cond_t cond; // operacao que sera realizada
+struct pro{
+        char *Nome_Processo;
+        pthread_cond_t con;
+        pthread_mutex_t m1, m2;
+        int flag_exe, flag_end, _status;
+        // colocar o pthread_t aqui tbm
 };
+
+// TODO: Testar para ver se essa funcao funciona
+pro* process_create(char *nome){
+        struct pro *ptr = (struct pro*) malloc(sizeof(struct pro));
+        ptr->Nome_Processo = nome;
+        // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
+        pthread_cond_init(&ptr->con, NULL);
+        pthread_mutex_init(&ptr->m1, NULL);
+        pthread_mutex_init(&ptr->m2, NULL);
+        return ptr;
+}
 
 struct node
 {
-    thread *proc; // operacao guardada no nó
+    pro *data; // operacao guardada no nó
     node *next;   // ponteiro para a proxima operacao
 };
 
@@ -53,18 +64,19 @@ void initQueue(opQueue **q)
 }
 
 // operacao atomica para adicionar uma nova operacao na fila
-void sendOp(opQueue *q, char *name)
+void push(opQueue *q, pro *dado)
 {
     // criacao da requisicao a ser adicionada na queue
     node *new_node;
     new_node = (node *)malloc(sizeof(node));
     new_node->next = NULL;
+    new_node->data = dado;
 
-    new_node->proc = (thread *)malloc(sizeof(thread));
-
-    strcpy(new_node->proc->name, name);
-    new_node->proc->status = ready;
-    pthread_cond_init(&new_node->proc->cond, NULL);
+    // new_node->data = (pro *)malloc(sizeof(pro));
+    
+    // strcpy(new_node->data->name, name);
+    // new_node->proc->status = ready;
+    // pthread_cond_init(&new_node->proc->cond, NULL);
 
     pthread_mutex_lock(&(q->mutex)); // lock necessario a partir do momento que se deseja alterar a queue q
     if (q->tail != NULL)
@@ -84,7 +96,7 @@ void sendOp(opQueue *q, char *name)
 }
 
 // operacao atomica para receber uma operacao da fila
-thread *getOp_wait(opQueue *q)
+thread *pop(opQueue *q)
 {
     thread *ret; // operacao que ira ser obtida da queue
 
@@ -95,7 +107,7 @@ thread *getOp_wait(opQueue *q)
     }
 
     // obtem o primeiro item da queue
-    ret = q->head->proc;
+    ret = q->head;
 
     node *tmp_node = q->head;
 

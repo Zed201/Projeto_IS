@@ -1,2 +1,3 @@
 all:
-		gcc ideia.c -pthread
+	gcc index.c 
+	./a.out
