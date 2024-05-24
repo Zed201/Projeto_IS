@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE 600
+#define _XOPEN_SOURCE 600           // Para garantir a compatibilidade com o POSIX;
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,7 +55,7 @@ int main()
         pthread_create(&threads[i], NULL, bubblesort, (void *)ids[i]);
     }
 
-    // Aguardar a conclusão das N threads;
+    // Aguardar a conclusão das N threads por segurança;
     for (i = 0; i < N; i++)         
     {
         pthread_join(threads[i], NULL);
@@ -104,7 +104,7 @@ void *bubblesort(void *arg)
     {
         for (j = start; j < end - 1; j++)
         {
-            // Ordenar em ordem crescente; Para ordem decrescente, trocar o sinal de comparação;
+            // Ordenar em ordem crescente; para ordem decrescente, trocar o sinal de comparação;
             if (aux[j] > aux[j + 1])
             {
                 temp = aux[j];
