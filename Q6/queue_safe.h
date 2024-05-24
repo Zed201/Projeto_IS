@@ -10,12 +10,6 @@ typedef struct node node;
 typedef struct queue fila;
 typedef struct pro pro;
 // tentar ver de colocar status
-enum status
-{
-    ready,
-    executing,
-    blocked
-};
 
 struct pro{
         char *Nome_Processo;
