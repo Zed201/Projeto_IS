@@ -12,29 +12,29 @@ void *escalonador_func(void* args){
         pro* temp_pro;
         int q = quatum_ms;
         // ver alguma forma de para quando nao tiver mais processos na fila
-       while(1){
+        while(1){
                 temp_pro = pop(lista_pronto); // se a lista
-                printf("Executando processo %s por %d ms", temp_pro->Nome_Processo, q);
-                pthread_mutex_lock(&temp_pro->m1);
-                temp_pro->exec_qtd = 0;
-                pthread_mutex_unlock(&temp_pro->m1);
+                printf("Executando processo %s por %d ms\n", temp_pro->Nome_Processo, q);
+                pthread_mutex_lock(&temp_pro->m2);
+                temp_pro->flag_exe = 0;
+                pthread_mutex_unlock(&temp_pro->m2);
 
                 pthread_cond_signal(&temp_pro->con);
-                usleep(1000 * quatum_ms);
+                usleep(10 * quatum_ms);
 
-                pthread_mutex_lock(&temp_pro->m1);
-                temp_pro->exec_qtd = 1;
-                pthread_mutex_unlock(&temp_pro->m1);               
-                
+                pthread_mutex_lock(&temp_pro->m2);
+                temp_pro->flag_exe = 1;
+                pthread_mutex_unlock(&temp_pro->m2);               
+
                 pthread_mutex_lock(&temp_pro->m1);
                 if(temp_pro->flag_end){
                         printf("Processo %s finalizado\n", temp_pro->Nome_Processo);
                 } else {
-                       push(lista_pronto, temp_pro);
+                        push(lista_pronto, temp_pro);
                         printf("Processo não terminou no tempo do quantum\n Esperando 2s\n");
                         sleep(2);
                 }
-                        pthread_mutex_unlock(&temp_pro->m1);               
+                pthread_mutex_unlock(&temp_pro->m1);               
         }
         pthread_exit(NULL);
 }
@@ -46,9 +46,10 @@ void *user(void* agrs){
 void *generic_func(void *args){
         // a propria thread tem acesso à sua estrutura de processo
         pro* p_data = (pro* ) args;
-        pthread_cond_wait(&p_data->con, &p_data->m1);
         printf("Processo de nome %s iniciado\n", p_data->Nome_Processo);
+        pthread_cond_wait(&p_data->con, &p_data->m1);
         for (int i = 0; i < p_data->exec_qtd; i++) {
+
                 if(p_data->flag_exe){
                         pthread_cond_wait(&p_data->con, &p_data->m1);
                         pthread_mutex_unlock(&p_data->m1);
@@ -67,10 +68,21 @@ void *generic_func(void *args){
 
 int main(){
         initQueue(&lista_pronto);
+        // testes
+        pthread_t t[3];
+        char* nomes[3] = {"T1", "T2", "T3"};
+        pro* temp;
+        for (int i = 0; i < 3; i++) {
+                temp = process_create(nomes[i]);
+                pthread_create(&temp->id, NULL, generic_func, temp);
+                push(lista_pronto, temp);
+        }
+
+
         pthread_t escalonador;
         pthread_create(&escalonador, NULL, escalonador_func, NULL);
         int wait_s = 2;
-        printf("Escalonador iniciado, vai começar em %ds", wait_s);
+        printf("Escalonador iniciado, vai começar em %ds\n", wait_s);
         sleep(wait_s);
         pthread_join(escalonador, NULL); // apenas espera o escalonador terminar
 
