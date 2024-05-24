@@ -30,7 +30,7 @@ int finalizer = 0;
 
 void *func(void *agrs){
         pthread_cond_wait(&c, &m);
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 4000000; i++) {
                 // sem esses mutex ele vai, por algum motivo, era para funcionar, mas n sei pq
                 //pthread_mutex_lock(&m2);
                 if(flag){ // flag 1 ele para, zero ele continua
@@ -42,6 +42,7 @@ void *func(void *agrs){
 
                 // alguma execuçao
                 printf("Alguma coisa %d\n", i);
+                fflush(stdout);
         }
 
         pthread_mutex_unlock(&m); // tem de dar unlock pois o m ta trancado
@@ -69,12 +70,12 @@ int main(){
                 printf("Iniciando thread por %d ms\n", exTms);
                 // se nao vai colocar no thread esse m2, ele nao tem necessidade de usar ele aqui
                 pthread_mutex_lock(&m2);
-                flag = 0; 
+                        flag = 0; 
                 pthread_mutex_unlock(&m2);
 
                 pthread_cond_signal(&c);
 
-                usleep(1000 * exTms);
+                usleep(100 * exTms);
                 printf("Thread dormindo por %d ms\n", waitTms);
 
                 pthread_mutex_lock(&m2);

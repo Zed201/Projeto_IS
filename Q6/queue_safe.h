@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,7 +7,7 @@
 #define QUEUE_H
 
 typedef struct node node;
-typedef struct queue opQueue;
+typedef struct queue fila;
 typedef struct pro pro;
 // tentar ver de colocar status
 enum status
@@ -21,6 +22,7 @@ struct pro{
         pthread_cond_t con;
         pthread_mutex_t m1, m2;
         int flag_exe, flag_end, _status;
+        int exec_qtd;
         // colocar o pthread_t aqui tbm
 };
 
@@ -29,6 +31,8 @@ pro* process_create(char *nome){
         struct pro *ptr = (struct pro*) malloc(sizeof(struct pro));
         ptr->Nome_Processo = nome;
         // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
+        // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
+        ptr->exec_qtd = 200000;
         pthread_cond_init(&ptr->con, NULL);
         pthread_mutex_init(&ptr->m1, NULL);
         pthread_mutex_init(&ptr->m2, NULL);
@@ -51,9 +55,9 @@ struct queue
 };
 
 // inicializador da fila
-void initQueue(opQueue **q)
+void initQueue(fila **q)
 {
-    opQueue *new_queue = (opQueue *)malloc(sizeof(opQueue));
+    fila *new_queue = (fila *)malloc(sizeof(fila));
     new_queue->head = NULL;
     new_queue->tail = NULL;
     new_queue->lenght = 0;
@@ -64,7 +68,7 @@ void initQueue(opQueue **q)
 }
 
 // operacao atomica para adicionar uma nova operacao na fila
-void push(opQueue *q, pro *dado)
+void push(fila *q, pro *dado)
 {
     // criacao da requisicao a ser adicionada na queue
     node *new_node;
@@ -91,23 +95,25 @@ void push(opQueue *q, pro *dado)
     }
 
     q->lenght++;
+    // talvez trocar para brodcast
     pthread_cond_signal(&q->cond);     // acorda o quem estiver dormindo na condicao (geramente o banco)
     pthread_mutex_unlock(&(q->mutex)); // libera o mutex
 }
 
 // operacao atomica para receber uma operacao da fila
-thread *pop(opQueue *q)
+pro *pop(fila *q)
 {
-    thread *ret; // operacao que ira ser obtida da queue
+    pro *ret; // operacao que ira ser obtida da queue
 
     pthread_mutex_lock(&(q->mutex)); // trava o mutex da queue se estiver livre
     while (q->lenght == 0)
     {
+            printf("Fila vazia esperando processos\n");
         pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
     }
 
     // obtem o primeiro item da queue
-    ret = q->head;
+    ret = q->head->data;
 
     node *tmp_node = q->head;
 
