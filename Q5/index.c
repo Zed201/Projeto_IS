@@ -27,7 +27,8 @@ int A[I][I] = {                     // Matriz dos coeficientes das equações;
     {2, 5, 6, 7},
     {4, 2, 5, 2}
 };
-int B[I] = {13, 11, 10, 12};            // Vetor (matriz coluna) dos resultados das equações;
+int B[I] = {13, 11, 10, 12};        // Vetor (matriz coluna) dos resultados das equações;
+int X[I] = {1, 1, 1, 1};            // Vetor (matriz coluna) dos resultados iniciais das equações (1 por padrão);
 
 // Definir a barreira;
 pthread_barrier_t barrier;
@@ -36,11 +37,12 @@ pthread_barrier_t barrier;
 void *jacobi(void *arg);            // Método de Jacobi;
 
 // Funções auxiliares se necessário;
+//
 
 int main()
 {
     // Variáveis auxiliares;
-    int N, i;
+    int N, i, j;
 
     // Determinar a quantidade N de threads;
     printf("Digite a quantidade de processadores (ou núcleos): ");
@@ -49,7 +51,8 @@ int main()
     // Variável das threads;
     pthread_t threads[N];           // N threads para o método de Jacobi;
 
-    // Variáveis auxiliares;
+    // Variável de argumentos das threads;
+    int *ids[N];                     // Identificadores das threads;
 
     // Inicializar a barreira para N threads;
     pthread_barrier_init(&barrier, NULL, N);
@@ -57,8 +60,9 @@ int main()
     // Criar N threads para o método de Jacobi;
     for (i = 0; i < N; i++)
     {
-        //
-        pthread_create(&threads[i], NULL, jacobi, NULL); //ajustar argumento se precisar
+        ids[i] = (int *)malloc(sizeof(int));
+        *ids[i] = i;    // acredito que seja melhor definir o começo dentro da função, para podermos ter o i atual tbm;
+        pthread_create(&threads[i], NULL, jacobi, (void *)ids[i]);
     }
 
     // Aguardar a conclusão das N threads;
@@ -70,11 +74,35 @@ int main()
     // Destruir a barreira;
     pthread_barrier_destroy(&barrier);
 
+    // Desalocar os argumentos das threads;
+    for (i = 0; i < N; i++)
+    {
+        free(ids[i]);
+    }
+
+    // Imprimir sistema de equações;
+    printf("Sistema de equações:\n");
+    for (i = 0; i < I; i++)
+    {
+        for (j = 0; j < I; j++)
+        {
+            printf("%dX[%d] ", A[i][j], j + 1);
+            if (j < I - 1)
+            {
+                printf("+ ");
+            }
+            else 
+            {
+                printf("= %d\n", B[i]);
+            }
+        }
+    }
+
     // Imprimir a solução do sistema;
     printf("Solução do sistema:\n");
     for (i = 0; i < I; i++)
     {
-        printf("x%d = %d\n", i + 1, B[i]); //não será B[i], mas sim a solução do sistema;
+        printf("X[%d] = %d\n", i + 1, X[i]);
     }
 
     // Encerrar o programa;
@@ -83,7 +111,14 @@ int main()
 }
 
 // Método de Jacobi;
-void *jacobi(void *arg)             // Não pode criar thread aqui dentro;
+void *jacobi(void *arg)
 {
-
+    // com o i definir o começo da iteração;
+    // definir o final e ajustar para o ultimo i (i==N-1);
+    // loop de refinos;
+        // equações de Jacobi (essa equação tem outro loop, provavelmente baseado em I);
+            // atualizar o valor de cada X[i];
+        // barreira;
+    // fim do loop de refinos;
+    // encerrar a thread;
 }
