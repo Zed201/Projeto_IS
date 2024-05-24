@@ -1,3 +1,3 @@
 all:
-	gcc index.c 
+	gcc index.c -pthread 
 	./a.out
