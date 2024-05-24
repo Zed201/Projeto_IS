@@ -5,7 +5,8 @@
 
 // a principio 1 para testar
 #define N 1
-#define quatum_ms 1 // quantum fixo, talvez mudar para um diferente para cada processo
+#define quatum_ms 10 // quantum fixo, talvez mudar para um diferente para cada processo
+int flag_quantum = 1; // se 0 ele executa com o mesmo quantum de todos se 1 ele vai aumentando o quantum por processo
 fila* lista_pronto;
 
 void *escalonador_func(void* args){
@@ -14,14 +15,22 @@ void *escalonador_func(void* args){
         // ver alguma forma de para quando nao tiver mais processos na fila
         while(1){
                 temp_pro = pop(lista_pronto); // se a lista
-                printf("Executando processo %s por %d ms\n", temp_pro->Nome_Processo, q);
+                if (flag_quantum) {
+
+                        printf("Executando processo %s por %d ms\n", temp_pro->Nome_Processo, temp_pro->quantum);
+                } else {
+                        printf("Executando processo %s por %d ms\n", temp_pro->Nome_Processo, q);
+                }
                 pthread_mutex_lock(&temp_pro->m2);
                 temp_pro->flag_exe = 0;
                 pthread_mutex_unlock(&temp_pro->m2);
 
                 pthread_cond_signal(&temp_pro->con);
-                usleep(10 * quatum_ms);
-
+                if (!flag_quantum) {
+                        usleep(1000 * quatum_ms);
+                } else {
+                        usleep(1000 * temp_pro->quantum);
+                }
                 pthread_mutex_lock(&temp_pro->m2);
                 temp_pro->flag_exe = 1;
                 pthread_mutex_unlock(&temp_pro->m2);               
@@ -31,7 +40,11 @@ void *escalonador_func(void* args){
                         printf("Processo %s finalizado\n", temp_pro->Nome_Processo);
                 } else {
                         push(lista_pronto, temp_pro);
-                        printf("Processo não terminou no tempo do quantum\n Esperando 2s\n");
+                        printf("Processo não terminou no tempo do quantum e voltara para o final da fila\nEsperando 2s\n");
+                        if (flag_quantum) {
+                                printf("Quantum aumentado\n");
+                                temp_pro->quantum *= 2;
+                        }
                         sleep(2);
                 }
                 pthread_mutex_unlock(&temp_pro->m1);               

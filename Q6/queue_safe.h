@@ -22,8 +22,9 @@ struct pro{
         pthread_cond_t con;
         pthread_mutex_t m1, m2;
         pthread_t id;
-        int flag_exe, flag_end, _status;
-        int exec_qtd;
+        int flag_exe, flag_end;
+        int exec_qtd, quantum;
+
         // colocar o pthread_t aqui tbm
 };
 
@@ -33,11 +34,12 @@ pro* process_create(char *nome){
         ptr->Nome_Processo = nome;
         // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
         // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
-        ptr->exec_qtd = 2000000;
+        ptr->exec_qtd = 1000000; // tamanho do loop fixo para todos basicamente
+        ptr->quantum = 10; // inicia com o padroa de 10 e vai aumentando se ele nao terminar
+
         pthread_cond_init(&ptr->con, NULL);
         pthread_mutex_init(&ptr->m1, NULL);
         pthread_mutex_init(&ptr->m2, NULL);
-        printf("Processo criado\n");
         
         return ptr;
 }
