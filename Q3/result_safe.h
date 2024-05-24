@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifndef RESULT_H
 #define RESULT_H
@@ -19,7 +20,7 @@ typedef struct cliente cliente;
 // struct para representar o resultado de uma operacao
 struct resultado {
     int status; // status final da operacao
-    int value;  // valor que pode ser retornado devido ao tipo da operacao
+    char msg[150];  // valor que pode ser retornado devido ao tipo da operacao
 };
 
 // struct que representa a interface de comunicacao com o cliente
@@ -35,7 +36,7 @@ void initCliente(cliente **cl, int id) {
     cliente *new_client = (cliente *)malloc(sizeof(cliente));
     new_client->id = id;
     new_client->result.status = off;
-    new_client->result.value = off;
+    strcpy(new_client->result.msg, "");
 
     pthread_mutex_init(&new_client->mu_result, NULL);  // inicia os mutex
     pthread_cond_init(&new_client->cond_result, NULL); // inicia as condicoes
@@ -46,7 +47,7 @@ void initCliente(cliente **cl, int id) {
 void sendResult(cliente *cl, resultado r) {
     pthread_mutex_lock(&cl->mu_result); // trava o mutex do cliente para acessar o resultado
     cl->result.status = r.status;       // define o status e valor de retorno
-    cl->result.value = r.value;
+    strcpy(cl->result.msg, r.msg);
 
     pthread_cond_signal(&cl->cond_result); // envia o sinal para o cliente de que o resultado foi retornado
     pthread_mutex_unlock(&cl->mu_result);  // libera o mutex
@@ -56,7 +57,7 @@ void sendResult(cliente *cl, resultado r) {
 void setWaitingResult(cliente *cl) {
     pthread_mutex_lock(&cl->mu_result); // trava o mutex do cliente para realizar as alteracoes
     cl->result.status = waiting;        // marca o resultado como em espera
-    cl->result.value = off;
+    strcpy(cl->result.msg, "");
 }
 
 // operacao atomica para dormir enquanto espera o sinal de que a operacao foi realizada
@@ -70,7 +71,7 @@ resultado getWaitingResult(cliente *cl) {
     }
 
     tmp_res.status = cl->result.status; // recebe o resultado da operacao
-    tmp_res.value = cl->result.value;
+    strcpy(tmp_res.msg, cl->result.msg);
 
     pthread_mutex_unlock(&cl->mu_result); // libera o mutex do cliente
 

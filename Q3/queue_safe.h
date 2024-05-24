@@ -10,14 +10,15 @@ typedef struct queue opQueue;
 
 // struct que representa um solicitação
 struct operacao {
-    int id;    // id do cliente
-    int op;    // operacao que sera realizada
-    int value; // valor caso seja deposito
+    int accountId;      // id da conta
+    int clientId;       // id do cliente
+    int op;             // operacao que sera realizada
+    float value;        // valor caso seja deposito ou saque
 };
 
 struct node {
-    operacao op; // operacao guardada no nó
-    node *next;  // ponteiro para a proxima operacao
+    operacao op;        // operacao guardada no nó
+    node *next;         // ponteiro para a proxima operacao
 };
 
 struct queue {
@@ -25,7 +26,7 @@ struct queue {
     node *tail;            // operacao mais recente
     int lenght;            // quantidade de operacoes na fila
     pthread_mutex_t mutex; // mutex para impedir condicao de corrida
-    pthread_cond_t cond;   // condicao para acordar quem estiver esperando a fila possuir requisicoes
+    pthread_cond_t cond;   // condicao para acordar quem estiver esperando a fila possuir requisicoes (banco)
 };
 
 // inicializador da fila
@@ -46,7 +47,9 @@ void sendOp(opQueue *q, operacao op) {
     node *new_node;
     new_node = (node *)malloc(sizeof(node));
     new_node->next = NULL;
-    new_node->op.id = op.id;
+    new_node->op.clientId = op.clientId;
+    new_node->op.accountId = op.accountId;
+
     new_node->op.op = op.op;
     new_node->op.value = op.value;
 
@@ -75,7 +78,8 @@ operacao getOp_wait(opQueue *q) {
     }
 
     // obtem o primeiro item da queue
-    ret.id = q->head->op.id;
+    ret.clientId = q->head->op.clientId;
+    ret.accountId = q->head->op.accountId;
     ret.op = q->head->op.op;
     ret.value = q->head->op.value;
     node *tmp_node = q->head;

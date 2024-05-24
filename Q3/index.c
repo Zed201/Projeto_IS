@@ -9,12 +9,21 @@
 #define N_CLIENTES 5
 #define MAX_OPERACOES 30
 
-enum operat
-{
+enum operat {
     saque,
     deposito,
     consulta
 };
+
+typedef struct bancoInfo {
+    int numClientes;
+    int numContas;
+} bancoInfo;
+
+typedef struct clientInfo {
+    int myId;
+    int accountId;
+} clientInfo;
 
 // fila de operacoes requisitadas para o banco -> interface
 opQueue *queue;
@@ -24,47 +33,53 @@ cliente *clientes_com[N_CLIENTES];
 
 // banco
 void *banco_th(void *args) {
-    int valores[N_CLIENTES]; // array com os valores depositado de cada cliente
-    for (int i = 0; i < N_CLIENTES; i++)
+    bancoInfo * info = (bancoInfo *)args;
+    
+    float valores[info->numContas]; // array com os valores depositado de cada cliente
+    for (int i = 0; i < info->numContas; i++)
     {
-        valores[i] = 0;
+        valores[i] = 0.0f;
     }
 
-    for (int i = 0; i < N_CLIENTES * MAX_OPERACOES; i++) {
-        operacao next; // variavel onde sera guardada a proxima operacao a ser processada
-        resultado res; // variavel onde serea guardada o resutlado da operacao
+    for (int i = 0; i < info->numClientes * MAX_OPERACOES; i++) {
+        operacao next; // guarda a proxima operacao a ser processada
+        resultado res; // guarda o resultado da operacao
+        strcpy(res.msg, "");
 
-        next = getOp_wait(queue); // dorme enquanto espera uma operacao da fila - atomico
+        next = getOp_wait(queue); // dorme enquanto espera uma operacao da fila
 
         // processa a operacao solicitada
         if (next.op == consulta) {
             res.status = ok;
-            res.value = valores[next.id];
+            sprintf(res.msg, "Cliente %d (%d): Seu saldo é R$%.2f.\n", next.accountId, next.clientId, valores[next.accountId]);
         }
         else if (next.value < 0) {
             res.status = fail;
-            res.value = off;
+            sprintf(res.msg, "Cliente %d (%d): Saque ou deposito negativos são invalidos.\n", next.accountId, next.clientId);
         }
         else if (next.op == deposito) {
-            valores[next.id] += next.value;
+            valores[next.accountId] += next.value;
 
             res.status = ok;
-            res.value = off;
+            sprintf(res.msg, "Cliente %d (%d): Deposito de R$%.2f realizado com sucesso, seu novo saldo é R$%.2f.\n", 
+                                next.accountId, next.clientId, next.value, valores[next.accountId]);
         }
         else if (next.op == saque) {
-            if (valores[next.id] - next.value >= 0) {
-                valores[next.id] -= next.value;
+            if (valores[next.accountId] - next.value >= 0) {
+                valores[next.accountId] -= next.value;
 
                 res.status = ok;
-                res.value = off;
+                sprintf(res.msg, "Cliente %d (%d): Saque de R$%.2f realizado com sucesso, seu novo saldo é R$%.2f.\n", 
+                                next.accountId, next.clientId, next.value, valores[next.accountId]);
             }
             else {
                 res.status = fail;
-                res.value = off;
+                sprintf(res.msg, "Cliente %d (%d): Saque de R$%.2f invalido, seu saldo atual é R$%.2f.\n", 
+                                next.accountId, next.clientId, next.value, valores[next.accountId]);
             }
         }
 
-        sendResult(clientes_com[next.id], res); // envia o resultado para o cliente - atomico
+        sendResult(clientes_com[next.clientId], res); // envia o resultado para o cliente
     }
 
     pthread_exit(NULL);
@@ -72,44 +87,29 @@ void *banco_th(void *args) {
 
 // cliente
 void *cliente_th(void *args) {
-    int *myID = (int *)args;
+    clientInfo *myInfo = (clientInfo *)args;
 
     for (int i = 0; i < MAX_OPERACOES; i++) {
-        operacao myOperation;      // variavel onde sera guardada a operacao a ser realizada
-        resultado res;             // variavel onde sera guardado o resultado da operacao
-        myOperation.id = *myID;    // id do cliente
-        myOperation.op = i % 3;    // operacaoes a serem realizadas
-        myOperation.value = i * 3; //
+        operacao myOperation;                       // variavel onde sera guardada a operacao a ser realizada
+        resultado res;                              // variavel onde sera guardado o resultado da operacao
+        myOperation.clientId = myInfo->myId;        // id do cliente
+        myOperation.accountId = myInfo->accountId;  // id da conta
+        myOperation.op = i % 3;                     // operacaoes a serem realizadas
+        myOperation.value = i * 3;                  //
 
         // trava o mutex do cliente, isso evita o caso em que a operacao é enviada e o
-        // banco processa e retorna o resultado antes do waiting ser colocado no resultado
-        // o waiting é necessário para distinguir operacoes passadas de recetes
-        setWaitingResult(clientes_com[*myID]);
+        // banco processa e retorna antes do resultado ser colocado como waiting
+        // o waiting é necessário para distinguir operacoes passadas de recentes
+        setWaitingResult(clientes_com[myInfo->myId]);
         sendOp(queue, myOperation); // envia a operacao para o banco
         res = getWaitingResult(
-            clientes_com[*myID]); // dorme enquanto espera o resultado e libera o mutex do cliente ao fim
+            clientes_com[myInfo->myId]); // dorme enquanto espera o resultado e libera o mutex do cliente ao fim
 
-        // processa o resultado obtido
-        if (myOperation.op != consulta) {
-            if (res.status == ok)
-            {
-                printf("Cliente %d: Operação realizada com sucesso!\n", *myID + 1);
-            }
-            else if (res.status == fail) // caso de tentar sacar sem saldo suficiente
-            {
-                printf("Cliente %d: Algo incorreto foi solicitado\n", *myID + 1);
-            }
-            else
-            {
-                printf("Cliente %d: Problema\n", *myID + 1);
-            }
-        }
-        else {
-            printf("Cliente %d: Valor guardado: %d\n", *myID + 1, res.value); // consulta de saldo
-        }
+        // print do resultado obtido
+        printf("%s", res.msg);
     }
 
-    free(myID);
+    free(myInfo);
     pthread_exit(NULL);
 }
 
@@ -121,13 +121,21 @@ int main()
     }
 
     pthread_t banco;
-    pthread_t clientes[N_CLIENTES];
+    pthread_t clientes[N_CLIENTES];    
 
-    pthread_create(&banco, NULL, &banco_th, NULL);
+    // instancia o banco
+    bancoInfo *b_info = (bancoInfo *)malloc(sizeof(bancoInfo));
+    b_info->numClientes = 5;
+    b_info->numContas = 5;
+
+    pthread_create(&banco, NULL, &banco_th, (void *)b_info);
+
+    // instancia os clientes
     for (int i = 0; i < N_CLIENTES; i++) {
-        int *id = (int *)malloc(sizeof(int));
-        *id = i;
-        pthread_create(&(clientes[i]), NULL, &cliente_th, (void *)id);
+        clientInfo *info = (clientInfo *)malloc(sizeof(clientInfo));
+        info->myId = i;
+        info->accountId = i;
+        pthread_create(&(clientes[i]), NULL, &cliente_th, (void *)info);
     }
 
     // espera todas as threads finalizarem
