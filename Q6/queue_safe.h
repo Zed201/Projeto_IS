@@ -8,40 +8,40 @@
 
 typedef struct node node;
 typedef struct queue fila;
-typedef struct pro pro;
+typedef struct process process;
 // tentar ver de colocar status
 
-struct pro{
-        char *Nome_Processo;
-        pthread_cond_t con;
-        pthread_mutex_t m1, m2;
-        pthread_t id;
-        int flag_exe, flag_end;
-        int exec_qtd, quantum;
+struct process {
+    char *name;
+    pthread_cond_t con;
+    pthread_mutex_t m_exec, m_end;
+    pthread_t id;
+    int flag_exec, flag_end;
+    int exec_qtd, quantum;
 
-        // colocar o pthread_t aqui tbm
+    // colocar o pthread_t aqui tbm
 };
 
 // TODO: Testar para ver se essa funcao funciona
-pro* process_create(char *nome, int qtd){
-        struct pro *ptr = (struct pro*) malloc(sizeof(struct pro));
-        ptr->Nome_Processo = nome;
-        ptr->flag_end = 0;
-        // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
-        // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
-        ptr->exec_qtd = qtd; // tamanho do loop fixo para todos basicamente
-        ptr->quantum = 10; // inicia com o padroa de 10 e vai aumentando se ele nao terminar
+process* process_create(char *nome, int qtd) {
+    struct process *ptr = (struct process*) malloc(sizeof(struct process));
+    ptr->name = nome;
+    ptr->flag_end = 0;
+    // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
+    // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
+    ptr->exec_qtd = qtd; // tamanho do loop fixo para todos basicamente
+    ptr->quantum = 10; // inicia com o padroa de 10 e vai aumentando se ele nao terminar
 
-        pthread_cond_init(&ptr->con, NULL);
-        pthread_mutex_init(&ptr->m1, NULL);
-        pthread_mutex_init(&ptr->m2, NULL);
-        
-        return ptr;
+    pthread_cond_init(&ptr->con, NULL);
+    pthread_mutex_init(&ptr->m_exec, NULL);
+    pthread_mutex_init(&ptr->m_end, NULL);
+    
+    return ptr;
 }
 
 struct node
 {
-    pro *data; // operacao guardada no nó
+    process *data; // operacao guardada no nó
     node *next;   // ponteiro para a proxima operacao
 };
 
@@ -68,7 +68,7 @@ void initQueue(fila **q)
 }
 
 // operacao atomica para adicionar uma nova operacao na fila
-void push(fila *q, pro *dado)
+void push(fila *q, process *dado)
 {
     // criacao da requisicao a ser adicionada na queue
     node *new_node;
@@ -76,7 +76,7 @@ void push(fila *q, pro *dado)
     new_node->next = NULL;
     new_node->data = dado;
 
-    // new_node->data = (pro *)malloc(sizeof(pro));
+    // new_node->data = (process *)malloc(sizeof(process));
     
     // strcpy(new_node->data->name, name);
     // new_node->proc->status = ready;
@@ -101,19 +101,19 @@ void push(fila *q, pro *dado)
 }
 
 // operacao atomica para receber uma operacao da fila
-pro *pop(fila *q)
+process *pop(fila *q)
 {
-    pro *ret; // operacao que ira ser obtida da queue
+    process *value; // operacao que ira ser obtida da queue
 
     pthread_mutex_lock(&(q->mutex)); // trava o mutex da queue se estiver livre
     while (q->lenght == 0)
     {
-            printf("Fila vazia esperando processos\n");
+        printf("Fila vazia esperando processos\n");
         pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
     }
 
     // obtem o primeiro item da queue
-    ret = q->head->data;
+    value = q->head->data;
 
     node *tmp_node = q->head;
 
@@ -128,7 +128,7 @@ pro *pop(fila *q)
 
     pthread_mutex_unlock(&(q->mutex)); // libera o mutex da queue
 
-    return ret;
+    return value;
 }
 
 #endif
