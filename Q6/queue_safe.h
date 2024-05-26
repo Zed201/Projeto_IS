@@ -108,8 +108,9 @@ process *pop(fila *q)
     pthread_mutex_lock(&(q->mutex)); // trava o mutex da queue se estiver livre
     while (q->lenght == 0)
     {
-        printf("Fila vazia esperando processos\n");
-        pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
+        // printf("Fila vazia esperando processos\n");
+        // pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
+        return NULL;
     }
 
     // obtem o primeiro item da queue
