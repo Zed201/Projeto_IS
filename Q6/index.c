@@ -3,106 +3,101 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#define time_testS 1 // tempo de espera para nao ficar bagunçado no print 
-#define N 3 // se o N nao for compativel com a quantidade de processos, ele trava pois a propria fila trava
-#define quatum_ms 1 // quantum fixo, em testes ele difrete de um tempo bom para cada pc
-// com numeros pequenos de processamento ele simplesmente executa e para
+#define N 10 // Representa o numero de "processos" executados ao "mesmo tempo", no caso o maximo que ele tira do escalonador
+#define quatum_ms 1 // quantum fixo, ba, basicamente o tempo que elas vao ficar executando em mss
+
 fila* lista_pronto;
 
 void *escalonador_func(void* args){
         process** temp_pro = (process**) malloc(sizeof(process*) * N);
-        int q = quatum_ms, t = time_testS;
-        // ver alguma forma de para quando nao tiver mais processos na fila
+        // quantum colocado no define apenas para ele nao ficar dando erro de nao ser int
+        int q = quatum_ms;
         while(1){
-                if (lista_pronto->lenght == 0) {
+                if (lista_pronto->lenght == 0) { // fila vazia ele fica esperando algum processo entrar 
                         printf("Fila Vazio\n");
+                        fflush(stdout); // para o print nao ficar acumulando buffer
                         pthread_mutex_lock(&lista_pronto->mutex);
                         pthread_cond_wait(&lista_pronto->cond, &lista_pronto->mutex); // dorme se a queue estiver vazia
                         pthread_mutex_unlock(&lista_pronto->mutex);
                 }
-
+                int nNULL = 0; // quantidade de processos dentro de temp_pro nao nulos(evitar iteraçoes de for desnecessarias)
                 for (int i = 0; i < N; i++) {        
-                        // fazer alguma verificação de quantidade de != NULL
-
-                        temp_pro[i] = pop(lista_pronto); // se a lista
+                        temp_pro[i] = pop(lista_pronto); // tira da a lista
                         if(temp_pro[i] != NULL){ 
-                                // mesmo quantum para todos
-                                printf("Executando processo %s por %d ms\n", temp_pro[i]->name, q);
-
+                                printf("Executando processo %s por %d ms\n", temp_pro[i]->name, q); // para saber quais processo vao executar
+                                fflush(stdout);
+                                nNULL++;
                         }
                 }
 
-                // printf("Espera %ds\n", t); // novamente para nao ficar muito bagunçado o print
-                // sleep(t);
-                printf("------------------------------------\n");
-                for(int i = 0; i < N; i++){
-                        if(temp_pro[i] != NULL){
-                                pthread_mutex_lock(&temp_pro[i]->m_exec);
-                                temp_pro[i]->flag_exec = 0;
-                                pthread_mutex_unlock(&temp_pro[i]->m_exec);
+                printf("------------------------------------\n"); // para nao ficar muito bagunão o print
+                fflush(stdout);
+                for(int i = 0; i < nNULL; i++){
+                        // modifica a flag para indicar que o processo vai "executar" e da o signal
+                        pthread_mutex_lock(&temp_pro[i]->m_exec);
+                        temp_pro[i]->flag_exec = 0;
+                        pthread_mutex_unlock(&temp_pro[i]->m_exec);
 
-                                pthread_cond_signal(&temp_pro[i]->con);
-                        }
+                        pthread_cond_signal(&temp_pro[i]->con);
                 }
-
+                // tempo que os processos vao ficar em execucao
                 usleep(1000 * quatum_ms);
 
-                for(int i = 0; i < N; i++){
-                        if(temp_pro[i] != NULL){
-
-                printf("Iteração escalonador\n");
-                                pthread_mutex_lock(&temp_pro[i]->m_exec);
-                                temp_pro[i]->flag_exec = 1;
-                                pthread_mutex_unlock(&temp_pro[i]->m_exec);               
-
-                                pthread_mutex_lock(&temp_pro[i]->m_end);
-                                if(temp_pro[i]->flag_end){
-                                        printf("Processo %s finalizado\n", temp_pro[i]->name);
-                                        // liberar memoira
-                                        pthread_mutex_destroy(&temp_pro[i]->m_end);
-                                        pthread_mutex_destroy(&temp_pro[i]->m_exec);
-                                        pthread_cond_destroy(&temp_pro[i]->con);
-                                        free(temp_pro[i]);
-                                } 
-                                else {
-                                        printf("Processo %s não terminou no tempo do quantum e voltara para o final da fila\n", temp_pro[i]->name);
-                                        push(lista_pronto, temp_pro[i]);
-                                }
-
-                                pthread_mutex_unlock(&temp_pro[i]->m_end);               
+                for(int i = 0; i < nNULL; i++){
+                        // muda a flag para o processo entrar no if e dormir
+                        pthread_mutex_lock(&temp_pro[i]->m_exec);
+                        temp_pro[i]->flag_exec = 1;
+                        pthread_mutex_unlock(&temp_pro[i]->m_exec);               
+                        // verifica se o processo terminou ou nao, ai volta para o final da fila
+                        pthread_mutex_lock(&temp_pro[i]->m_end);
+                        if(temp_pro[i]->flag_end){
+                                printf("Processo %s finalizado\n", temp_pro[i]->name);
+                                fflush(stdout);
+                                // liberar memoira
+                                pthread_mutex_destroy(&temp_pro[i]->m_end);
+                                pthread_mutex_destroy(&temp_pro[i]->m_exec);
+                                pthread_cond_destroy(&temp_pro[i]->con);
+                                free(temp_pro[i]);
+                        } 
+                        else {
+                                printf("Processo %s nao terminou\n", temp_pro[i]->name);
+                                fflush(stdout);
+                                push(lista_pronto, temp_pro[i]);
                         }
+
+                        pthread_mutex_unlock(&temp_pro[i]->m_end);               
                 }
         }
         pthread_exit(NULL);
 }
 
+// usado para ficar inserindo os processos
 void *user(void* agrs){
         pthread_exit(NULL);
 }
 
+// funcao generica usada para ficar em loop 
 void *generic_func(void *args){
         // a propria thread tem acesso à sua estrutura de processo
         process* p_data = (process* ) args;
         printf("Processo de nome %s iniciado\n", p_data->name);
         pthread_mutex_lock(&p_data->m_end);
-        pthread_cond_wait(&p_data->con, &p_data->m_end);
+        pthread_cond_wait(&p_data->con, &p_data->m_end); // logo quando a thread e criada ela para para ser liberada apenas
+        //  quando o escalonador liberar ela
         pthread_mutex_unlock(&p_data->m_end);
-        for (int i = 0; i < p_data->exec_qtd; i++) {
 
-                // pthread_mutex_lock(&p_data->m_end);
+        for (int i = 0; i < p_data->exec_qtd; i++) {
                 if(p_data->flag_exec){
-                        // trocar para exec os mutex
-                        // pthread_cond_wait(&p_data->con, &p_data->m_end);
+                        // serve para travar a execucao do processo
                         pthread_mutex_lock(&p_data->m_exec);
                         pthread_cond_wait(&p_data->con, &p_data->m_exec);
                         pthread_mutex_unlock(&p_data->m_exec);
                 }
-                // pthread_mutex_unlock(&p_data->m_end);
 
                 printf("%s-%d\n", p_data->name, i);
                 fflush(stdout);
         }
-        // pthread_mutex_unlock(&p_data->m_end); // alguns casos ele sai do for, se o p_data->exec_qtd for pequeno, com esse mutex locked e trava tudo
+        // para indicar que o processo terminou para o escalonador
         pthread_mutex_lock(&p_data->m_end);
         p_data->flag_end = 1;
         pthread_mutex_unlock(&p_data->m_end);
@@ -128,7 +123,7 @@ int main(){
         pthread_t escalonador;
         pthread_create(&escalonador, NULL, escalonador_func, NULL);
         int wait_s = 2;
-        printf("Escalonador iniciado, vai começar em %ds\n", wait_s);
+        printf("Escalonador criado, vai iniciar em %ds\n", wait_s);
         sleep(wait_s);
         pthread_join(escalonador, NULL); // apenas espera o escalonador terminar
 

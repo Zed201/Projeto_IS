@@ -9,28 +9,23 @@
 typedef struct node node;
 typedef struct queue fila;
 typedef struct process process;
-// tentar ver de colocar status
 
+// struct do processo
 struct process {
         char *name;
         pthread_cond_t con;
         pthread_mutex_t m_exec, m_end;
         pthread_t id;
         int flag_exec, flag_end;
-        int exec_qtd, quantum;
-
-        // colocar o pthread_t aqui tbm
+        int exec_qtd;
 };
 
-// TODO: Testar para ver se essa funcao funciona
+// basicamente cria um processo com o nome e com a "quantidade de execucoes" determinada
 process* process_create(char *nome, int qtd) {
-        struct process *ptr = (struct process*) malloc(sizeof(struct process));
+        process *ptr = (process*) malloc(sizeof(process));
         ptr->name = nome;
         ptr->flag_end = 0;
-        // ver onde coloca o destroy, talvez na hora da struct tiver finalizado a função
-        // dar alguma quantidade aleatoria de exec, tem que ser bastante alto
         ptr->exec_qtd = qtd; // tamanho do loop fixo para todos basicamente
-        ptr->quantum = 10; // inicia com o padroa de 10 e vai aumentando se ele nao terminar
 
         pthread_cond_init(&ptr->con, NULL);
         pthread_mutex_init(&ptr->m_exec, NULL);
@@ -41,17 +36,17 @@ process* process_create(char *nome, int qtd) {
 
 struct node
 {
-        process *data; // operacao guardada no nó
-        node *next;   // ponteiro para a proxima operacao
+        process *data; // thread guardada no nó
+        node *next;   // ponteiro para o proxima node
 };
 
 struct queue
 {
-        node *head;            // operacao mais antiga
-        node *tail;            // operacao mais recente
-        int lenght;            // quantidade de operacoes na fila
+        node *head;            // node mais antiga
+        node *tail;            // node mais recente
+        int lenght;            // quantidade de nodes na fila
         pthread_mutex_t mutex; // mutex para impedir condicao de corrida
-        pthread_cond_t cond;   // condicao para acordar quem estiver esperando a fila possuir requisicoes (banco)
+        pthread_cond_t cond;   // condicao para acordar quem estiver esperando
 };
 
 // inicializador da fila
@@ -70,17 +65,11 @@ void initQueue(fila **q)
 // operacao atomica para adicionar uma nova operacao na fila
 void push(fila *q, process *dado)
 {
-        // criacao da requisicao a ser adicionada na queue
+        // criacao do node a ser adicionada na queue
         node *new_node;
         new_node = (node *)malloc(sizeof(node));
         new_node->next = NULL;
         new_node->data = dado;
-
-        // new_node->data = (process *)malloc(sizeof(process));
-
-        // strcpy(new_node->data->name, name);
-        // new_node->proc->status = ready;
-        // pthread_cond_init(&new_node->proc->cond, NULL);
 
         pthread_mutex_lock(&(q->mutex)); // lock necessario a partir do momento que se deseja alterar a queue q
         if (q->tail != NULL)
@@ -95,21 +84,19 @@ void push(fila *q, process *dado)
         }
 
         q->lenght++;
-        // talvez trocar para brodcast
-        pthread_cond_signal(&q->cond);     // acorda o quem estiver dormindo na condicao (geramente o banco)
+        pthread_cond_signal(&q->cond);     // acorda o quem estiver dormindo na condicao (no caso o escalonado)
         pthread_mutex_unlock(&(q->mutex)); // libera o mutex
 }
 
-// operacao atomica para receber uma operacao da fila
+// operacao atomica para retirar um processo da fila
 process *pop(fila *q)
 {
-        process *value; // operacao que ira ser obtida da queue
+        process *value; // processo que ira ser obtida da queue
 
         pthread_mutex_lock(&(q->mutex)); // trava o mutex da queue se estiver livre
         while (q->lenght == 0)
         {
-                // printf("Fila vazia esperando processos\n");
-                // pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
+                // se nao tiver nenhum node ele libera e retorna null
                 pthread_mutex_unlock(&(q->mutex));
                 return NULL;
         }
