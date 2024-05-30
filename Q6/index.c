@@ -54,6 +54,7 @@ void *escalonador_func(void* args) {
             if (temp_pro[i]->flag_end) {
                 printf("Processo %s finalizado\n", temp_pro[i]->name);
                 fflush(stdout);
+                pthread_mutex_unlock(&temp_pro[i]->m_end);               
                 // liberar memoira
                 pthread_mutex_destroy(&temp_pro[i]->m_end);
                 pthread_mutex_destroy(&temp_pro[i]->m_exec);
@@ -61,12 +62,11 @@ void *escalonador_func(void* args) {
                 free(temp_pro[i]);
                 total_processed++;
             } else {
+                pthread_mutex_unlock(&temp_pro[i]->m_end);               
                 printf("Processo %s nao terminou\n", temp_pro[i]->name);
                 fflush(stdout);
                 push(lista_pronto, temp_pro[i]);
             }
-
-            pthread_mutex_unlock(&temp_pro[i]->m_end);               
         }
     }
     pthread_exit(NULL);
@@ -77,10 +77,10 @@ void *generic_func(void *args) {
     // a propria thread tem acesso à sua estrutura de processo
     process* p_data = (process* ) args;
     printf("Processo de nome %s iniciado\n", p_data->name);
-    pthread_mutex_lock(&p_data->m_end);
-    pthread_cond_wait(&p_data->con, &p_data->m_end); // logo quando a thread e criada ela para para ser liberada apenas
+    pthread_mutex_lock(&p_data->m_exec);
+    pthread_cond_wait(&p_data->con, &p_data->m_exec); // logo quando a thread e criada ela para para ser liberada apenas
     //  quando o escalonador liberar ela
-    pthread_mutex_unlock(&p_data->m_end);
+    pthread_mutex_unlock(&p_data->m_exec);
 
     for (int i = 0; i < p_data->exec_qtd; i++) {
         if (p_data->flag_exec) {
