@@ -4,96 +4,108 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+// Definir as structs para a operação e a fila de operações;
 typedef struct operacao operacao;
 typedef struct node node;
 typedef struct queue opQueue;
 
-// struct que representa um solicitação
+// Operação a ser realizada no banco;
 struct operacao {
-    int accountId;      // id da conta
-    int clientId;       // id do cliente
-    int op;             // operacao que sera realizada
-    float value;        // valor caso seja deposito ou saque
+    int accountId;                          // ID da conta;
+    int clientId;                           // ID do cliente
+    int op;                                 // Operação que será realizada;
+    float value;                            // Valor em caso de depósito ou saque;
 };
 
+// Nó da fila de operações;
 struct node {
-    operacao op;        // operacao guardada no nó
-    node *next;         // ponteiro para a proxima operacao
+    operacao op;                            // Operação a ser realizada;
+    node *next;                             // Próxima operação;
 };
 
+// Fila de operações a serem realizadas no banco;
 struct queue {
-    node *head;            // operacao mais antiga
-    node *tail;            // operacao mais recente
-    int lenght;            // quantidade de operacoes na fila
-    pthread_mutex_t mutex; // mutex para impedir condicao de corrida
-    pthread_cond_t cond;   // condicao para acordar quem estiver esperando a fila possuir requisicoes (banco)
+    node *head;                             // Operação mais antiga;
+    node *tail;                             // Operação mais recente;
+    int lenght;                             // Tamanho da fila;
+    pthread_mutex_t mutex;                  // Mutex para operações na fila;
+    pthread_cond_t cond;                    // Condição para acordar quem estiver esperando uma operação;
 };
 
-// inicializador da fila
-void initQueue(opQueue **q) {
+// Inicializar a fila de operações;
+void initQueue(opQueue **q)
+{
+    // Alocar memória para a fila;
     opQueue *new_queue = (opQueue *)malloc(sizeof(opQueue));
     new_queue->head = NULL;
     new_queue->tail = NULL;
     new_queue->lenght = 0;
 
-    pthread_mutex_init(&new_queue->mutex, NULL); // inicia os mutex
-    pthread_cond_init(&new_queue->cond, NULL);   // inicia as condicoes
+    // Inicializar o mutex e a condição da fila;
+    pthread_mutex_init(&new_queue->mutex, NULL);
+    pthread_cond_init(&new_queue->cond, NULL);
     *q = new_queue;
 }
 
-// operacao atomica para adicionar uma nova operacao na fila
-void sendOp(opQueue *q, operacao op) {
-    // criacao da requisicao a ser adicionada na queue
+// Enviar atomicamente uma operação para a fila;
+void sendOp(opQueue *q, operacao op)
+{
+    // Alocar memória para a nova operação;
     node *new_node;
     new_node = (node *)malloc(sizeof(node));
     new_node->next = NULL;
     new_node->op.clientId = op.clientId;
     new_node->op.accountId = op.accountId;
-
     new_node->op.op = op.op;
     new_node->op.value = op.value;
 
-    pthread_mutex_lock(&(q->mutex)); // lock necessario a partir do momento que se deseja alterar a queue q
+    // Travar o mutex da fila e adicionar a operação;
+    pthread_mutex_lock(&(q->mutex));
     if (q->tail != NULL) {
         q->tail->next = new_node;
     }
     q->tail = new_node;
-
     if (q->head == NULL) {
         q->head = new_node;
     }
 
+    // Atualizar tamanho da fila;
     q->lenght++;
-    pthread_cond_signal(&q->cond);     // acorda o quem estiver dormindo na condicao (geramente o banco)
-    pthread_mutex_unlock(&(q->mutex)); // libera o mutex
+
+    // Liberar o mutex da fila e acordar quem estiver esperando;
+    pthread_cond_signal(&q->cond);
+    pthread_mutex_unlock(&(q->mutex));
 }
 
-// operacao atomica para receber uma operacao da fila
-operacao getOp_wait(opQueue *q) {
-    operacao ret; // operacao que ira ser obtida da queue
+// Obter atomicamente uma operação da fila;
+operacao getOp_wait(opQueue *q)
+{
+    // Operação a ser obtida da fila;
+    operacao ret;
 
-    pthread_mutex_lock(&(q->mutex)); // trava o mutex da queue se estiver livre
+    // Travar o mutex da fila e esperar até que haja uma operação;
+    pthread_mutex_lock(&(q->mutex));
     while (q->lenght == 0) {
-        pthread_cond_wait(&q->cond, &q->mutex); // dorme se a queue estiver vazia
+        pthread_cond_wait(&q->cond, &q->mutex);
     }
 
-    // obtem o primeiro item da queue
+    // Obter a operação da fila;
     ret.clientId = q->head->op.clientId;
     ret.accountId = q->head->op.accountId;
     ret.op = q->head->op.op;
     ret.value = q->head->op.value;
     node *tmp_node = q->head;
-
     if (q->head == q->tail) {
         q->tail = NULL;
     }
 
+    // Atualizar tamanho da fila e liberar o nó da operação;
     q->lenght--;
     q->head = q->head->next;
     free(tmp_node);
 
-    pthread_mutex_unlock(&(q->mutex)); // libera o mutex da queue
-
+    // Liberar o mutex da fila e retornar a operação;
+    pthread_mutex_unlock(&(q->mutex));
     return ret;
 }
 
