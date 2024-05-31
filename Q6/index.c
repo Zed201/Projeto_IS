@@ -67,7 +67,7 @@ void *escalonador_func(void* args)
         // Listar os processos prontos e identificá-los;
         int nNULL = 0;                  // Número de processos prontos;
         for (int i = 0; i < N; i++)
-        {        
+        {   
             temp_pro[i] = pop(lista_pronto);
             if (temp_pro[i] != NULL)
             { 
@@ -84,6 +84,7 @@ void *escalonador_func(void* args)
         // Evitar erros de execução;
         for (int i = 0; i < nNULL; i++)
         {
+            if (temp_pro[i] == NULL) continue;
             pthread_mutex_lock(&temp_pro[i]->m_exec);
             temp_pro[i]->flag_exec = 0;
             pthread_cond_signal(&temp_pro[i]->con);
@@ -96,6 +97,7 @@ void *escalonador_func(void* args)
         // Verificar se os processos foram concluídos e aguardar se não foram;
         for (int i = 0; i < nNULL; i++)
         {
+            if (temp_pro[i] == NULL) continue;
             pthread_mutex_lock(&temp_pro[i]->m_exec);
             temp_pro[i]->flag_exec = 1;
             pthread_mutex_unlock(&temp_pro[i]->m_exec);               
