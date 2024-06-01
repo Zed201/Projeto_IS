@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 // Definir parâmetros de execução;
-#define N 10                            // Número de processos que podem ser executados simultaneamente;
+#define N 8                            // Número de processos que podem ser executados simultaneamente;
 #define quatum_ms 1                     // Tempo de execução de cada processo em milissegundos;
 #define MAX_REQUEST 300                 // Número máximo de requisições de processos;
 
@@ -50,22 +50,21 @@ void *escalonador_func(void* args)
 
     // Inicializar as variáveis do escalonador;
     process** temp_pro = (process**) malloc(sizeof(process*) * N);
+    for (int i = 0; i < N; i++) temp_pro[i] = NULL;
 
     // Executar o escalonador enquanto houverem processos a serem executados;
     while (total_processed < MAX_REQUEST)
     {
         // Verificar se há processos prontos para execução e aguardar se não houver;
-        if (lista_pronto->lenght == 0)
-        { 
+        pthread_mutex_lock(&lista_pronto->mutex); // trava o mutex da queue se estiver livre
+        while (lista_pronto->lenght == 0) {
             printf("Fila Vazio\n");
             fflush(stdout);             // Limpar o buffer de saída; 
-            pthread_mutex_lock(&lista_pronto->mutex);
-            pthread_cond_wait(&lista_pronto->cond, &lista_pronto->mutex);
-            pthread_mutex_unlock(&lista_pronto->mutex);
+            pthread_cond_wait(&lista_pronto->cond, &lista_pronto->mutex); // dorme se a queue estiver vazia
         }
+        pthread_mutex_unlock(&lista_pronto->mutex); // libera o mutex
 
         // Listar os processos prontos e identificá-los;
-        int nNULL = 0;                  // Número de processos prontos;
         for (int i = 0; i < N; i++)
         {   
             temp_pro[i] = pop(lista_pronto);
@@ -73,7 +72,6 @@ void *escalonador_func(void* args)
             { 
                 printf("Executando processo %s por %d ms\n", temp_pro[i]->name, q);
                 fflush(stdout);         // Limpar o buffer de saída;
-                nNULL++;                // Atualizar o número de processos prontos;
             }
         }
 
@@ -82,9 +80,10 @@ void *escalonador_func(void* args)
         fflush(stdout);                 // Limpar o buffer de saída;
 
         // Evitar erros de execução;
-        for (int i = 0; i < nNULL; i++)
+        for (int i = 0; i < N; i++)
         {
             if (temp_pro[i] == NULL) continue;
+
             pthread_mutex_lock(&temp_pro[i]->m_exec);
             temp_pro[i]->flag_exec = 0;
             pthread_cond_signal(&temp_pro[i]->con);
@@ -95,9 +94,10 @@ void *escalonador_func(void* args)
         usleep(1000 * quatum_ms);
 
         // Verificar se os processos foram concluídos e aguardar se não foram;
-        for (int i = 0; i < nNULL; i++)
+        for (int i = 0; i < N; i++)
         {
             if (temp_pro[i] == NULL) continue;
+
             pthread_mutex_lock(&temp_pro[i]->m_exec);
             temp_pro[i]->flag_exec = 1;
             pthread_mutex_unlock(&temp_pro[i]->m_exec);               
@@ -116,7 +116,6 @@ void *escalonador_func(void* args)
                 pthread_mutex_destroy(&temp_pro[i]->m_exec);
                 pthread_cond_destroy(&temp_pro[i]->con);
                 free(temp_pro[i]);
-
                 // Atualizar o número total de processos processados;
                 total_processed++;
             } else {
@@ -129,6 +128,8 @@ void *escalonador_func(void* args)
                 // Reorganizar a fila de processos;
                 push(lista_pronto, temp_pro[i]);
             }
+
+            temp_pro[i] = NULL;
         }
     }
 
@@ -169,8 +170,8 @@ void *user(void* args)
     // Criar requisições de processos;
     for (int i = 0; i < MAX_REQUEST; i++)
     {
-        // Aguardar um tempo aleatório entre 100ms e 500ms;
-        float sleep_between_req = (float) (rand() % 5) * 100.0;
+        // Aguardar um tempo aleatório entre 1µs e 5µs;
+        float sleep_between_req = (float) (rand() % 5);
         usleep(sleep_between_req);
         
         // Criar um novo processo e adicionar à lista de processos prontos;
